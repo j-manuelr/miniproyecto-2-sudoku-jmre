@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane prefHeight="760" prefWidth="620" styleClass="root-pane" stylesheets="@game-style.css" xmlns:fx="http://javafx.com/fxml/1" xmlns="http://javafx.com/javafx/17" fx:controller="com.example.sudoku.controller.GameController">
+
+    <top>
+        <VBox spacing="10" styleClass="header-shell">
+            <padding>
+                <Insets bottom="14" left="22" right="22" top="18" />
+            </padding>
+
+            <HBox alignment="CENTER_LEFT" spacing="10">
+                <VBox spacing="2">
+                    <Label styleClass="app-title" text="Sudoku" />
+                    <Label styleClass="app-subtitle" text="Modo 6x6" />
+                </VBox>
+                <Region HBox.hgrow="ALWAYS" />
+                <VBox alignment="CENTER_RIGHT" spacing="4" styleClass="timer-shell">
+                    <Label styleClass="timer-caption" text="Tiempo" />
+                    <Label fx:id="timerLabel" styleClass="timer-pill" text="00:00" />
+                </VBox>
+            </HBox>
+            <Separator styleClass="soft-separator" />
+        </VBox>
+    </top>
+
+    <center>
+        <VBox alignment="TOP_CENTER" spacing="14" styleClass="content-shell">
+            <padding>
+                <Insets bottom="8" left="22" right="22" top="6" />
+            </padding>
+
+            <StackPane styleClass="board-shell">
+                <padding>
+                    <Insets bottom="16" left="16" right="16" top="16" />
+                </padding>
+                <GridPane fx:id="sudokuGrid" alignment="CENTER" hgap="0" styleClass="sudoku-grid" vgap="0" />
+            </StackPane>
+
+            <Label fx:id="statusLabel" alignment="CENTER" maxWidth="560" styleClass="status-label" text="" wrapText="true" />
+        </VBox>
+    </center>
+
+    <bottom>
+        <VBox alignment="CENTER" spacing="10" styleClass="footer-shell">
+            <Separator styleClass="soft-separator" />
+            <HBox alignment="CENTER" spacing="10" styleClass="action-bar">
+                <padding>
+                    <Insets bottom="18" left="14" right="14" top="8" />
+                </padding>
+
+                <Button mnemonicParsing="false" onAction="#handleNewGame" styleClass="btn-cyan" text="Nueva Partida" />
+
+                <Button mnemonicParsing="false" onAction="#handleHelp" styleClass="btn-yellow" text="Ayuda" />
+
+                <Button mnemonicParsing="false" onAction="#handleUndo" styleClass="btn-green" text="Deshacer" />
+
+                <Button mnemonicParsing="false" onAction="#handleRestart" styleClass="btn-purple" text="Reiniciar" />
+            </HBox>
+        </VBox>
+    </bottom>
+
+</BorderPane>
