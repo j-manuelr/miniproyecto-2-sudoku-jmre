@@ -9,7 +9,7 @@ import javafx.stage.Stage;
  * Bootstraps the JavaFX runtime and delegates stage initialization
  * to {@link GameView}.
  *
- * @author Juan Rosero
+ * @author Juan Rosero, Natalia Parra
  * @version 1.0
  */
 public class Main extends Application {

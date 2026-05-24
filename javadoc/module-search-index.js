@@ -1,0 +1,1 @@
+moduleSearchIndex = [{"l":"com.univalle.sudoku"}];updateSearchResults();

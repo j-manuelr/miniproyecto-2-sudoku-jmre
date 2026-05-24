@@ -20,7 +20,7 @@ import java.util.Deque;
  *       triple so the user can step back through their moves.</li>
  * </ul>
  *
- * @author Juan Rosero
+ * @author Juan Rosero, Natalia Parra
  * @version 1.0
  */
 public class SudokuModel implements ISudokuModel {
@@ -256,6 +256,11 @@ public class SudokuModel implements ISudokuModel {
             }
         }
         return false;
+    }
+
+
+    public boolean isCorrectValue(int row, int col, int value) {
+        return (String.valueOf(solution[row][col]).equals(String.valueOf(value)));
     }
 
     /**

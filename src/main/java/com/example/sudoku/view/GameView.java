@@ -16,7 +16,7 @@ import java.util.Objects;
  * <p>Implements {@link IGameView} to expose the minimal lifecycle surface
  * required by the MVC architecture.</p>
  *
- * @author Juan Rosero
+ * @author Juan Rosero, Natalia Parra
  * @version 1.0
  */
 public class GameView extends Stage implements IGameView {

@@ -8,7 +8,7 @@ package com.example.sudoku.model;
  * <p>The board is a 6×6 grid divided into six 2×3 blocks.
  * Valid cell values are integers in the range [1, 6].</p>
  *
- * @author Juan Rosero
+ * @author Juan Rosero, Natalia Parra
  * @version 1.0
  */
 public interface ISudokuModel {
@@ -107,4 +107,6 @@ public interface ISudokuModel {
      * Has no effect if the history is empty.
      */
     void undoMove();
+
+    boolean isCorrectValue(int row, int col, int value);
 }

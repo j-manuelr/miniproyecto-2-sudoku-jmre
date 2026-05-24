@@ -12,7 +12,7 @@ import javafx.scene.input.MouseEvent;
  * in the controller extend this class instead of directly implementing
  * {@link ICellEventListener}, reducing boilerplate.</p>
  *
- * @author Juan Rosero
+ * @author Juan Rosero, Natalia Parra
  * @version 1.0
  * @see ICellEventListener
  */

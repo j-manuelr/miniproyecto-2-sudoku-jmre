@@ -1,0 +1,6 @@
+module:com.univalle.sudoku
+com.example.sudoku
+com.example.sudoku.controller
+com.example.sudoku.events
+com.example.sudoku.model
+com.example.sudoku.view

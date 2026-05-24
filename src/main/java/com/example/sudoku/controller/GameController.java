@@ -46,7 +46,7 @@ import java.util.ResourceBundle;
  *       (cyan colour) from user entries.</li>
  * </ol>
  *
- * @author Juan Rosero
+ * @author Juan Rosero, Natalia Parra
  * @version 1.0
  */
 public class GameController implements Initializable, IGameController {
@@ -89,6 +89,8 @@ public class GameController implements Initializable, IGameController {
     /** Elapsed seconds since the last (re)start. */
     private int secondsElapsed;
 
+    private int hintRow= -1;
+    private int hintCol= -1;
     // -------------------------------------------------------------------------
     // Initializable
     // -------------------------------------------------------------------------
@@ -344,13 +346,12 @@ public class GameController implements Initializable, IGameController {
         int r = target[0];
         int c = target[1];
         int hint = model.getHintForCell(r, c);
-        model.setValue(r, c, hint);
+
 
         // Refresh all cells first, then apply the hint highlight separately
         refreshAllCells();
         refreshCell(r, c, true);
-
-        showStatus("Sugerencia: " + hint + " -> fila " + (r + 1) + ", columna " + (c + 1), true);
+        showStatus("SUGERENCIA: Pon el número " + hint + " en la fila " + (r + 1) + ", columna: " + (c + 1), true);
 
         if (model.isSolved()) showWinMessage();
     }
@@ -428,8 +429,9 @@ public class GameController implements Initializable, IGameController {
         stopTimer();
         int m = secondsElapsed / 60;
         int s = secondsElapsed % 60;
-        showStatus("Felicitaciones. Completado en " + String.format("%02d:%02d", m, s) + ".", true);
+        showStatus("¡FELICIDADES!. Completaste el sudoku en " + String.format("%02d:%02d", m, s) + ".", true);
     }
+
 
     // =========================================================================
     // Named inner class — CellInputHandler
@@ -469,13 +471,26 @@ public class GameController implements Initializable, IGameController {
             }
 
             String text = event.getText();
+            TextField cell = cells[row][col];
 
             if (text != null && text.matches("[1-6]")) {
                 int value = Integer.parseInt(text);
-                model.setValue(row, col, value);
-                refreshAllCells();
-                clearStatus();
-                if (model.isSolved()) showWinMessage();
+                if(model.isCorrectValue(row, col, value)){
+                    model.setValue(row, col, value);
+                    cell.getStyleClass().add("cell-hint");
+                    showStatus("NÚMERO CORRECTO!",true);
+                    refreshAllCells();
+                    cell.getStyleClass().add("cell-hint");
+                    if (model.isSolved()) showWinMessage();
+                }
+                else {
+                    model.setValue(row, col, value);
+                    showStatus("El número ingresado es incorrecto en el sudoku", false);
+                    refreshAllCells();
+                    cell.getStyleClass().add("cell-conflict");
+                    model.undoMove();
+                }
+
 
             } else if (event.getCode() == KeyCode.BACK_SPACE
                     || event.getCode() == KeyCode.DELETE) {
@@ -516,7 +531,7 @@ public class GameController implements Initializable, IGameController {
             if (!model.isFixed(row, col)
                     && !cell.getStyleClass().contains("cell-conflict")
                     && !cell.getStyleClass().contains("cell-hint")) {
-                cell.setStyle("-fx-background-color: #181840;");
+                //cell.setStyle("-fx-background-color: #FFFF00;");
             }
         }
 

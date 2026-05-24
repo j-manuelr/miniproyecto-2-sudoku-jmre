@@ -5,7 +5,7 @@ package com.example.sudoku.controller;
  * Exposes the action handlers wired to the FXML buttons and defines the
  * interface through which external components can trigger game operations.
  *
- * @author Juan Rosero
+ * @author Juan Rosero, Natalia Parra
  * @version 1.0
  */
 public interface IGameController {

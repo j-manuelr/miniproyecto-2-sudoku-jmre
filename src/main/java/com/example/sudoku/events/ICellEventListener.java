@@ -8,7 +8,7 @@ import javafx.scene.input.MouseEvent;
  * Classes that need to react to user input on individual cells should
  * implement this interface (or extend {@link CellEventAdapter}).
  *
- * @author Juan Rosero
+ * @author Juan Rosero, Natalia Parra
  * @version 1.0
  */
 public interface ICellEventListener {

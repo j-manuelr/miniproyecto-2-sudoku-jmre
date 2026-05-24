@@ -5,7 +5,7 @@ package com.example.sudoku.view;
  * Defines the minimum lifecycle operations that the main game window
  * must expose so the rest of the application can control its visibility.
  *
- * @author Juan Rosero
+ * @author Juan Rosero, Natalia Parra
  * @version 1.0
  */
 public interface IGameView {
