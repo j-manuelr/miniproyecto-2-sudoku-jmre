@@ -1,7 +1,7 @@
 # Sudoku 6×6 — Mini Proyecto #2
 
 **Curso:** 750014C Fundamentos de Programación Orientada a Eventos (FPOE) — 2026-1  
-**Integrantes:** Juan Rosero  
+**Integrantes:** Juan Rosero - Natalia Parra  
 **Versión:** 1.0
 
 ---
