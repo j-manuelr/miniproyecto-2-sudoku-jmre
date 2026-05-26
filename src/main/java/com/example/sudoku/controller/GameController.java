@@ -159,7 +159,6 @@ public class GameController implements Initializable, IGameController {
 
         int r = target[0], c = target[1];
         int hint = model.getHintForCell(r, c);
-        model.setValue(r, c, hint);
 
         renderer.refreshAll(selectedRow, selectedCol);
         renderer.refresh(r, c, true, selectedRow, selectedCol);
