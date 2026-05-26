@@ -3,18 +3,14 @@ package com.example.sudoku.controller;
 import com.example.sudoku.events.CellEventAdapter;
 import com.example.sudoku.model.ISudokuModel;
 import com.example.sudoku.model.SudokuModel;
-import javafx.animation.KeyFrame;
-import javafx.animation.Timeline;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
-import javafx.geometry.Pos;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.GridPane;
-import javafx.util.Duration;
 
 import java.net.URL;
 import java.util.ResourceBundle;
@@ -22,28 +18,24 @@ import java.util.ResourceBundle;
 /**
  * JavaFX controller for the Sudoku game view ({@code game-view.fxml}).
  *
- * <p>Responsibilities:
+ * <p>Single responsibility: wire the collaborating components and handle
+ * the four user actions exposed by {@link IGameController}. Everything else
+ * is delegated:</p>
  * <ul>
- *   <li>Builds the 6×6 cell grid programmatically inside the FXML-injected
- *       {@link GridPane}, using 2×3 block sub-grids.</li>
- *   <li>Delegates input events to the named inner class
- *       {@link CellInputHandler}, which extends {@link CellEventAdapter}.</li>
- *   <li>Keeps the visual state (CSS classes) in sync with the model after
- *       every user action.</li>
- *   <li>Manages a live game timer via a {@link Timeline}.</li>
+ *   <li>{@link BoardBuilder}  — constructs the JavaFX node grid.</li>
+ *   <li>{@link CellRenderer}  — applies CSS style classes to cells.</li>
+ *   <li>{@link GameTimer}     — manages the countdown label.</li>
+ *   <li>{@link SudokuModel}   — owns all game/board state.</li>
+ *   <li>{@link CellInputHandler} (inner class) — routes cell input events.</li>
  * </ul>
  *
- * <p><b>UX/UI heuristics applied:</b>
+ * <h2>UX heuristics applied (Nielsen)</h2>
  * <ol>
- *   <li><em>Visibility of system status</em> — real-time conflict highlights
- *       (red border) and a live timer.</li>
- *   <li><em>Match between system and real world</em> — Spanish labels and
- *       familiar Sudoku vocabulary.</li>
- *   <li><em>User control and freedom</em> — Undo and Restart actions.</li>
- *   <li><em>Error prevention</em> — only digits 1–6 accepted; out-of-range
- *       keys are silently consumed.</li>
- *   <li><em>Recognition over recall</em> — fixed clues visually distinct
- *       (cyan colour) from user entries.</li>
+ *   <li><em>Visibility of system status</em> — real-time conflict highlights and live timer.</li>
+ *   <li><em>Match between system and real world</em> — Spanish labels and familiar vocabulary.</li>
+ *   <li><em>User control and freedom</em> — Undo (button + Ctrl+Z) and Restart always available.</li>
+ *   <li><em>Error prevention</em> — only digits 1–6 accepted; wrong digits auto-reverted.</li>
+ *   <li><em>Recognition over recall</em> — fixed clues visually distinct from user entries.</li>
  * </ol>
  *
  * @author Juan Rosero, Natalia Parra
@@ -51,285 +43,107 @@ import java.util.ResourceBundle;
  */
 public class GameController implements Initializable, IGameController {
 
-    private static final int CELL_SIZE = 63;
+    // ── FXML-injected nodes ───────────────────────────────────────────────────
+    @FXML private GridPane sudokuGrid;
+    @FXML private Label    statusLabel;
+    @FXML private Label    timerLabel;
+
     private static final String STATUS_SUCCESS_CLASS = "status-success";
 
-    // -------------------------------------------------------------------------
-    // FXML-injected nodes
-    // -------------------------------------------------------------------------
-
-    /** Outer GridPane (3 block-rows × 2 block-cols) injected from FXML. */
-    @FXML private GridPane sudokuGrid;
-
-    /** Status/feedback label below the board. */
-    @FXML private Label statusLabel;
-
-    /** Live game-timer label in the header area. */
-    @FXML private Label timerLabel;
-
-    // -------------------------------------------------------------------------
-    // State
-    // -------------------------------------------------------------------------
-
-    /** Reference to the game model. */
+    // ── Collaborators ─────────────────────────────────────────────────────────
     private ISudokuModel model;
+    private TextField[][]  cells;
+    private CellRenderer   renderer;
+    private GameTimer      gameTimer;
 
-    /** 6×6 matrix of the TextField cells composing the board. */
-    private TextField[][] cells;
-
-    /** Row index of the currently selected cell (−1 = none selected). */
+    // ── Selection state ───────────────────────────────────────────────────────
     private int selectedRow = -1;
-
-    /** Column index of the currently selected cell (−1 = none selected). */
     private int selectedCol = -1;
 
-    /** JavaFX animation timeline used as the game timer. */
-    private Timeline timer;
-
-    /** Elapsed seconds since the last (re)start. */
-    private int secondsElapsed;
-
-    private int hintRow= -1;
-    private int hintCol= -1;
-    // -------------------------------------------------------------------------
-    // Initializable
-    // -------------------------------------------------------------------------
+    // ── Initializable ─────────────────────────────────────────────────────────
 
     /**
-     * Invoked automatically by the {@link javafx.fxml.FXMLLoader} after all
-     * {@code @FXML} fields have been injected.
-     * Creates the model, builds the board grid, loads the first puzzle, and
-     * starts the timer.
+     * Invoked by {@link javafx.fxml.FXMLLoader} after all {@code @FXML} fields
+     * are injected. Creates collaborators, builds the grid, and starts the timer.
      *
      * @param url            unused
      * @param resourceBundle unused
      */
     @Override
     public void initialize(URL url, ResourceBundle resourceBundle) {
-        cells = new TextField[ISudokuModel.BOARD_SIZE][ISudokuModel.BOARD_SIZE];
-        model = new SudokuModel();
-        buildGrid();
-        loadBoard();
-        clearStatus();
-        startTimer();
+        model     = new SudokuModel();
+        cells     = new BoardBuilder().build(sudokuGrid);
+        renderer  = new CellRenderer(cells, model);
+        gameTimer = new GameTimer(timerLabel);
 
-        // Prevent running timeline leaks when the window is closed.
-        timerLabel.sceneProperty().addListener((obsScene, oldScene, newScene) -> {
-            if (newScene != null) {
-                newScene.windowProperty().addListener((obsWindow, oldWindow, newWindow) -> {
-                    if (newWindow != null) {
-                        newWindow.setOnHidden(event -> stopTimer());
-                    }
+        attachHandlers();
+        renderer.refreshAll(selectedRow, selectedCol);
+        clearStatus();
+        gameTimer.start();
+
+        // Stop timer cleanly when the window closes
+        timerLabel.sceneProperty().addListener((obs, old, scene) -> {
+            if (scene != null) {
+                scene.windowProperty().addListener((obsW, oldW, window) -> {
+                    if (window != null) window.setOnHidden(e -> gameTimer.stop());
                 });
             }
         });
     }
 
-    // -------------------------------------------------------------------------
-    // Grid construction
-    // -------------------------------------------------------------------------
-
     /**
-     * Populates {@link #sudokuGrid} with six 2×3 block sub-grids.
-     * Each block is a styled {@link GridPane} containing the individual
-     * {@link TextField} cells.
+     * Attaches a {@link CellInputHandler} instance to each cell returned by
+     * {@link BoardBuilder}. Called once after the grid is built.
      */
-    private void buildGrid() {
-        sudokuGrid.setHgap(6);
-        sudokuGrid.setVgap(6);
-
-        int blockRowCount = ISudokuModel.BOARD_SIZE / ISudokuModel.BLOCK_ROWS; // 3
-        int blockColCount = ISudokuModel.BOARD_SIZE / ISudokuModel.BLOCK_COLS; // 2
-
-        for (int br = 0; br < blockRowCount; br++) {
-            for (int bc = 0; bc < blockColCount; bc++) {
-                GridPane blockPane = buildBlockPane(br, bc);
-                sudokuGrid.add(blockPane, bc, br);
-            }
-        }
-    }
-
-    /**
-     * Creates a single 2×3 block sub-grid for the given block coordinates.
-     *
-     * @param blockRow block row index (0–2)
-     * @param blockCol block column index (0–1)
-     * @return a styled {@link GridPane} containing the cells for this block
-     */
-    private GridPane buildBlockPane(int blockRow, int blockCol) {
-        GridPane block = new GridPane();
-        block.getStyleClass().add("block-pane");
-        block.setHgap(3);
-        block.setVgap(3);
-
-        for (int r = 0; r < ISudokuModel.BLOCK_ROWS; r++) {
-            for (int c = 0; c < ISudokuModel.BLOCK_COLS; c++) {
-                int globalRow = blockRow * ISudokuModel.BLOCK_ROWS + r;
-                int globalCol = blockCol * ISudokuModel.BLOCK_COLS + c;
-                TextField cell = buildCell(globalRow, globalCol);
-                cells[globalRow][globalCol] = cell;
-                block.add(cell, c, r);
-            }
-        }
-        return block;
-    }
-
-    /**
-     * Creates and configures a single board {@link TextField} at the given
-     * global board position.
-     * Registers {@link CellInputHandler} (inner class) for key and mouse events.
-     *
-     * @param row global row index (0–5)
-     * @param col global column index (0–5)
-     * @return the fully configured cell
-     */
-    private TextField buildCell(int row, int col) {
-        TextField tf = new TextField();
-        tf.setPrefSize(CELL_SIZE, CELL_SIZE);
-        tf.setMinSize(CELL_SIZE, CELL_SIZE);
-        tf.setMaxSize(CELL_SIZE, CELL_SIZE);
-        tf.setAlignment(Pos.CENTER);
-        tf.setEditable(false);   // input is handled exclusively via key events
-
-        // Attach the named inner-class handler for this cell
-        CellInputHandler handler = new CellInputHandler();
-        tf.setOnKeyPressed(e  -> handler.onCellKeyPressed(e, row, col));
-        tf.setOnMouseClicked(e -> handler.onCellClicked(e, row, col));
-        tf.setOnMouseEntered(e -> handler.onCellMouseEntered(e, row, col));
-        tf.setOnMouseExited(e  -> handler.onCellMouseExited(e, row, col));
-
-        return tf;
-    }
-
-    // -------------------------------------------------------------------------
-    // Board rendering
-    // -------------------------------------------------------------------------
-
-    /**
-     * Reads the model and updates every cell's text and CSS style class.
-     */
-    private void loadBoard() {
+    private void attachHandlers() {
         for (int r = 0; r < ISudokuModel.BOARD_SIZE; r++) {
             for (int c = 0; c < ISudokuModel.BOARD_SIZE; c++) {
-                refreshCell(r, c, false);
+                final int row = r, col = c;
+                CellInputHandler handler = new CellInputHandler();
+                cells[r][c].setOnKeyPressed(e  -> handler.onCellKeyPressed(e, row, col));
+                cells[r][c].setOnMouseClicked(e -> handler.onCellClicked(e, row, col));
+                cells[r][c].setOnMouseEntered(e -> handler.onCellMouseEntered(e, row, col));
+                cells[r][c].setOnMouseExited(e  -> handler.onCellMouseExited(e, row, col));
             }
         }
     }
 
-    /**
-     * Refreshes all cells, optionally preserving the hint highlight on one cell.
-     */
-    private void refreshAllCells() {
-        for (int r = 0; r < ISudokuModel.BOARD_SIZE; r++) {
-            for (int c = 0; c < ISudokuModel.BOARD_SIZE; c++) {
-                refreshCell(r, c, false);
-            }
-        }
-    }
-
-    /**
-     * Updates the text content and CSS style class of a single cell to reflect
-     * the current model state.
-     *
-     * <p>Style-class priority (highest to lowest):
-     * <ol>
-     *   <li>{@code cell-hint}    — hint-filled, no conflict</li>
-     *   <li>{@code cell-fixed}   — immutable puzzle clue</li>
-     *   <li>{@code cell-conflict}— user value violates a rule</li>
-     *   <li>{@code cell-selected}— currently focused cell</li>
-     *   <li>{@code cell-editable}— normal editable cell</li>
-     * </ol>
-     *
-     * @param row      row index
-     * @param col      column index
-     * @param isHint   {@code true} keeps the {@code cell-hint} style
-     */
-    private void refreshCell(int row, int col, boolean isHint) {
-        TextField cell = cells[row][col];
-        int val = model.getValue(row, col);
-        cell.setText(val == 0 ? "" : String.valueOf(val));
-
-        cell.getStyleClass().removeAll(
-                "cell-fixed", "cell-editable",
-                "cell-conflict", "cell-selected", "cell-hint"
-        );
-
-        if (isHint) {
-            cell.getStyleClass().add("cell-hint");
-        } else if (model.isFixed(row, col)) {
-            cell.getStyleClass().add("cell-fixed");
-        } else if (val != 0 && model.hasConflict(row, col)) {
-            cell.getStyleClass().add("cell-conflict");
-        } else if (row == selectedRow && col == selectedCol) {
-            cell.getStyleClass().add("cell-selected");
-        } else {
-            cell.getStyleClass().add("cell-editable");
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // Selection
-    // -------------------------------------------------------------------------
-
-    /**
-     * Marks the given cell as selected, refreshes the board visuals, and
-     * moves keyboard focus to that cell.
-     *
-     * @param row row index of the cell to select
-     * @param col column index of the cell to select
-     */
-    private void selectCell(int row, int col) {
-        selectedRow = row;
-        selectedCol = col;
-        refreshAllCells();
-        cells[row][col].requestFocus();
-    }
-
-    // -------------------------------------------------------------------------
-    // IGameController — FXML actions
-    // -------------------------------------------------------------------------
+    // ── IGameController ───────────────────────────────────────────────────────
 
     /**
      * {@inheritDoc}
-     * Wired to the "Nueva Partida" button in the FXML.
+     * Wired to the "Nueva Partida" button.
      */
-    @FXML
-    @Override
+    @FXML @Override
     public void handleNewGame() {
         model.generateNewPuzzle();
-        selectedRow = -1;
-        selectedCol = -1;
+        selectedRow = selectedCol = -1;
         clearStatus();
-        loadBoard();
-        restartTimer();
+        renderer.refreshAll(selectedRow, selectedCol);
+        gameTimer.restart();
     }
 
     /**
      * {@inheritDoc}
-     * Wired to the "Reiniciar" button in the FXML.
+     * Wired to the "Reiniciar" button.
      */
-    @FXML
-    @Override
+    @FXML @Override
     public void handleRestart() {
         model.resetPuzzle();
-        selectedRow = -1;
-        selectedCol = -1;
+        selectedRow = selectedCol = -1;
         clearStatus();
-        loadBoard();
-        restartTimer();
+        renderer.refreshAll(selectedRow, selectedCol);
+        gameTimer.restart();
     }
 
     /**
      * {@inheritDoc}
-     * Wired to the "Ayuda" button in the FXML.
-     * Fills one empty cell automatically with the correct value and
-     * highlights it with the {@code cell-hint} style class.
+     * Wired to the "Ayuda" button. Prefers the selected cell if it is empty;
+     * otherwise picks a random empty cell.
      */
-    @FXML
-    @Override
+    @FXML @Override
     public void handleHelp() {
-        // Prefer the currently selected cell if it is empty
-        int[] target;
+        int[] target = null;
         if (selectedRow >= 0 && selectedCol >= 0
                 && !model.isFixed(selectedRow, selectedCol)
                 && model.getValue(selectedRow, selectedCol) == 0) {
@@ -339,70 +153,49 @@ public class GameController implements Initializable, IGameController {
         }
 
         if (target == null) {
-            showStatus("El tablero ya esta completo.", false);
+            showStatus("El tablero ya está completo.", false);
             return;
         }
 
-        int r = target[0];
-        int c = target[1];
+        int r = target[0], c = target[1];
         int hint = model.getHintForCell(r, c);
+        model.setValue(r, c, hint);
 
-
-        // Refresh all cells first, then apply the hint highlight separately
-        refreshAllCells();
-        refreshCell(r, c, true);
-        showStatus("SUGERENCIA: Pon el número " + hint + " en la fila " + (r + 1) + ", columna: " + (c + 1), true);
+        renderer.refreshAll(selectedRow, selectedCol);
+        renderer.refresh(r, c, true, selectedRow, selectedCol);
+        showStatus("SUGERENCIA: Pon el número " + hint
+                + " en la fila " + (r + 1) + ", columna: " + (c + 1), true);
 
         if (model.isSolved()) showWinMessage();
     }
 
     /**
      * {@inheritDoc}
-     * Wired to the "↩ Deshacer" button in the FXML.
+     * Wired to the "Deshacer" button.
      */
-    @FXML
-    @Override
+    @FXML @Override
     public void handleUndo() {
         model.undoMove();
-        refreshAllCells();
+        renderer.refreshAll(selectedRow, selectedCol);
         clearStatus();
     }
 
-    // -------------------------------------------------------------------------
-    // Timer
-    // -------------------------------------------------------------------------
+    // ── Selection ─────────────────────────────────────────────────────────────
 
     /**
-     * Creates and starts a one-second interval {@link Timeline} that
-     * increments {@link #secondsElapsed} and updates {@link #timerLabel}.
+     * Marks the given cell as selected, refreshes the board, and moves focus.
+     *
+     * @param row row index to select
+     * @param col column index to select
      */
-    private void startTimer() {
-        secondsElapsed = 0;
-        timer = new Timeline(new KeyFrame(Duration.seconds(1), e -> {
-            secondsElapsed++;
-            int m = secondsElapsed / 60;
-            int s = secondsElapsed % 60;
-            timerLabel.setText(String.format("%02d:%02d", m, s));
-        }));
-        timer.setCycleCount(Timeline.INDEFINITE);
-        timer.play();
+    private void selectCell(int row, int col) {
+        selectedRow = row;
+        selectedCol = col;
+        renderer.refreshAll(selectedRow, selectedCol);
+        cells[row][col].requestFocus();
     }
 
-    /**
-     * Stops the running timer, resets the display to {@code 00:00}, and
-     * starts a fresh timeline.
-     */
-    private void restartTimer() {
-        stopTimer();
-        timerLabel.setText("00:00");
-        startTimer();
-    }
-
-    private void stopTimer() {
-        if (timer != null) {
-            timer.stop();
-        }
-    }
+    // ── Status helpers ────────────────────────────────────────────────────────
 
     private void clearStatus() {
         statusLabel.getStyleClass().remove(STATUS_SUCCESS_CLASS);
@@ -411,41 +204,28 @@ public class GameController implements Initializable, IGameController {
 
     private void showStatus(String message, boolean success) {
         statusLabel.getStyleClass().remove(STATUS_SUCCESS_CLASS);
-        if (success) {
-            statusLabel.getStyleClass().add(STATUS_SUCCESS_CLASS);
-        }
+        if (success) statusLabel.getStyleClass().add(STATUS_SUCCESS_CLASS);
         statusLabel.setText(message);
     }
 
-    // -------------------------------------------------------------------------
-    // Win message
-    // -------------------------------------------------------------------------
-
-    /**
-     * Stops the timer and shows a congratulatory message in the status label
-     * with the elapsed time.
-     */
     private void showWinMessage() {
-        stopTimer();
-        int m = secondsElapsed / 60;
-        int s = secondsElapsed % 60;
-        showStatus("¡FELICIDADES!. Completaste el sudoku en " + String.format("%02d:%02d", m, s) + ".", true);
+        gameTimer.stop();
+        showStatus("¡FELICIDADES! Completaste el sudoku en "
+                + gameTimer.getFormattedTime() + ".", true);
     }
-
 
     // =========================================================================
     // Named inner class — CellInputHandler
     // =========================================================================
 
     /**
-     * Handles keyboard and mouse events for a specific board cell.
+     * Routes keyboard and mouse events for a single board cell.
      *
-     * <p>This <em>named inner class</em> extends {@link CellEventAdapter} and
-     * overrides only the required callback methods, following the Adapter
-     * design pattern. Each cell in the board gets its own {@code CellInputHandler}
-     * instance and receives coordinates from the event binding.</p>
+     * <p>Follows the <em>Adapter design pattern</em> by extending
+     * {@link CellEventAdapter} and overriding only the required callbacks,
+     * avoiding empty method bodies throughout the controller.</p>
      *
-     * @author Juan Rosero
+     * @author Juan Rosero, Natalia Parra
      * @version 1.0
      */
     private class CellInputHandler extends CellEventAdapter {
@@ -453,98 +233,72 @@ public class GameController implements Initializable, IGameController {
         /**
          * Handles key-press events:
          * <ul>
-         *   <li>Digits 1–6 → write value to model and validate board.</li>
+         *   <li>1–6 → validates against solution; correct values are kept
+         *       with a green highlight. Wrong values show a red border
+         *       <strong>without</strong> being written to the model — this
+         *       avoids the previous bug where model.setValue + model.undoMove
+         *       left the model and the UI in an inconsistent state (the cell
+         *       displayed the rejected digit even though the model had rolled
+         *       it back, because JavaFX renders only after the handler returns).
+         *       </li>
          *   <li>BACKSPACE / DELETE → clear the cell.</li>
-         *   <li>Ctrl+Z → trigger undo.</li>
-         *   <li>All other keys → silently consumed (no default text insert).</li>
+         *   <li>Ctrl+Z → undo last move.</li>
+         *   <li>All other keys → silently consumed.</li>
          * </ul>
-         *
-         * @param event the originating {@link KeyEvent}
-         * @param row   the cell's row
-         * @param col   the cell's column
          */
         @Override
         public void onCellKeyPressed(KeyEvent event, int row, int col) {
-            if (model.isFixed(row, col)) {
-                event.consume();
-                return;
-            }
+            if (model.isFixed(row, col)) { event.consume(); return; }
 
             String text = event.getText();
-            TextField cell = cells[row][col];
 
             if (text != null && text.matches("[1-6]")) {
                 int value = Integer.parseInt(text);
-                if(model.isCorrectValue(row, col, value)){
-                    model.setValue(row, col, value);
-                    cell.getStyleClass().add("cell-hint");
-                    showStatus("NÚMERO CORRECTO!",true);
-                    refreshAllCells();
-                    cell.getStyleClass().add("cell-hint");
-                    if (model.isSolved()) showWinMessage();
-                }
-                else {
-                    model.setValue(row, col, value);
-                    showStatus("El número ingresado es incorrecto en el sudoku", false);
-                    refreshAllCells();
-                    cell.getStyleClass().add("cell-conflict");
-                    model.undoMove();
-                }
 
+                if (model.isCorrectValue(row, col, value)) {
+                    // ── Correct digit ─────────────────────────────────────────
+                    model.setValue(row, col, value);
+                    renderer.refreshAll(selectedRow, selectedCol);
+                    cells[row][col].getStyleClass().add("cell-hint");
+                    showStatus("¡NÚMERO CORRECTO!", true);
+                    if (model.isSolved()) showWinMessage();
+                } else {
+                    // ── Wrong digit (BUG FIX) ──────────────────────────────────
+                    // Only apply visual feedback; do NOT touch the model or the
+                    // undo history. The old code called model.setValue followed
+                    // by model.undoMove in the same JavaFX event, which caused
+                    // the cell to display the wrong number while the model already
+                    // held the original value — a model / view state mismatch.
+                    cells[row][col].getStyleClass().removeAll(
+                            "cell-fixed", "cell-editable", "cell-selected", "cell-hint");
+                    if (!cells[row][col].getStyleClass().contains("cell-conflict")) {
+                        cells[row][col].getStyleClass().add("cell-conflict");
+                    }
+                    showStatus("El número ingresado es incorrecto en el sudoku.", false);
+                }
 
             } else if (event.getCode() == KeyCode.BACK_SPACE
                     || event.getCode() == KeyCode.DELETE) {
                 model.setValue(row, col, 0);
-                refreshAllCells();
+                renderer.refreshAll(selectedRow, selectedCol);
                 clearStatus();
 
             } else if (event.getCode() == KeyCode.Z && event.isControlDown()) {
                 handleUndo();
             }
-
             event.consume();
         }
 
-        /**
-         * Handles mouse-click events by selecting the clicked cell.
-         *
-         * @param event the originating {@link MouseEvent}
-         * @param row   the cell's row index
-         * @param col   the cell's column index
-         */
+        /** Selects the clicked cell. */
         @Override
         public void onCellClicked(MouseEvent event, int row, int col) {
             selectCell(row, col);
         }
 
-        /**
-         * Applies a subtle hover style to non-fixed, non-conflict cells when
-         * the mouse enters, providing visual feedback (heuristic: affordance).
-         *
-         * @param event the originating {@link MouseEvent}
-         * @param row   the cell's row index
-         * @param col   the cell's column index
-         */
-        @Override
-        public void onCellMouseEntered(MouseEvent event, int row, int col) {
-            TextField cell = cells[row][col];
-            if (!model.isFixed(row, col)
-                    && !cell.getStyleClass().contains("cell-conflict")
-                    && !cell.getStyleClass().contains("cell-hint")) {
-                //cell.setStyle("-fx-background-color: #FFFF00;");
-            }
-        }
-
-        /**
-         * Removes the hover style when the mouse exits the cell.
-         *
-         * @param event the originating {@link MouseEvent}
-         * @param row   the cell's row index
-         * @param col   the cell's column index
-         */
+        /** Restores normal cell style on mouse exit. */
         @Override
         public void onCellMouseExited(MouseEvent event, int row, int col) {
-            refreshCell(row, col, false);
+            renderer.refresh(row, col, false, selectedRow, selectedCol);
         }
     }
 }
