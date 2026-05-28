@@ -169,6 +169,13 @@
     -fx-font-weight: bold;
 }
 
+.status-label.status-error {
+    -fx-text-fill: #ffb3c6;
+    -fx-border-color: #ff5f8c;
+    -fx-font-style: normal;
+    -fx-font-weight: bold;
+}
+
 .footer-shell {
     -fx-background-color: #171a33;
     -fx-border-color: #2b2f53;
