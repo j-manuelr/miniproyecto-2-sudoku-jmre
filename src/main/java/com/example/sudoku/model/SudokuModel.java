@@ -2,13 +2,19 @@ package com.example.sudoku.model;
 
 import java.util.ArrayList;
 import java.util.Collections;
+<<<<<<< HEAD
 import java.util.LinkedList;
 
+=======
+>>>>>>> 90907dc1bcae63501b91cb1c565795d81e6d4986
 /**
- * Concrete implementation of {@link ISudokuModel} for a 6×6 Sudoku puzzle.
+ * Coordinator for the Sudoku game model.
  *
- * <h2>Data structures used (beyond plain arrays)</h2>
+ * <p>Single responsibility: manage the current board state (read/write cell
+ * values, track which cells are fixed, expose hints) and coordinate the three
+ * collaborating classes that each own one distinct concern:</p>
  * <ul>
+<<<<<<< HEAD
  *   <li><b>{@code LinkedList<Integer>} (implements {@code Deque<Integer>})</b> —
  *       Used as a flat row-major board for both {@code solution} and {@code board}.
  *       Cell {@code (row, col)} maps to index {@code row * BOARD_SIZE + col}.
@@ -27,6 +33,20 @@ import java.util.LinkedList;
  *   <li>Solution <em>generation</em> is delegated to {@link SudokuBoardGenerator}.</li>
  *   <li>Undo <em>history</em> is delegated to {@link MoveHistory}.</li>
  *   <li>This class owns only: board state, validation, and puzzle-clue placement.</li>
+=======
+ *   <li>{@link SudokuGenerator} — board and solution generation.</li>
+ *   <li>{@link SudokuValidator} — rule validation and completion checks.</li>
+ *   <li>{@link MoveHistory}     — undo-history stack.</li>
+ * </ul>
+ *
+ * <h2>Board trees</h2>
+ * Three {@link SudokuBoardTree} instances replace the plain
+ * {@code int[][]} / {@code boolean[][]} arrays that would otherwise be used:
+ * <ul>
+ *   <li>{@code boardTree}    — current player-visible state (0 = empty, 1–6 filled).</li>
+ *   <li>{@code solutionTree} — immutable complete solution for hint/validation.</li>
+ *   <li>{@code fixedTree}    — mask: 1 = immutable clue cell, 0 = editable.</li>
+>>>>>>> 90907dc1bcae63501b91cb1c565795d81e6d4986
  * </ul>
  *
  * @author Juan Rosero, Natalia Parra
@@ -34,6 +54,7 @@ import java.util.LinkedList;
  */
 public class SudokuModel implements ISudokuModel {
 
+<<<<<<< HEAD
     /**
      * Complete solution board stored as a flat {@code LinkedList<Integer>}
      * (which implements {@code Deque<Integer>}).
@@ -67,22 +88,52 @@ public class SudokuModel implements ISudokuModel {
         fixed       = new boolean[BOARD_SIZE][BOARD_SIZE];
         moveHistory = new MoveHistory();
         generator   = new SudokuBoardGenerator();
+=======
+    // ── Board trees ────────────────────────────────────────────────────────────
+    private final SudokuBoardTree boardTree;
+    private final SudokuBoardTree solutionTree;
+    private final SudokuBoardTree fixedTree;
+
+    // ── Collaborators ──────────────────────────────────────────────────────────
+    private final SudokuGenerator generator;
+    private final SudokuValidator  validator;
+    private final MoveHistory      moveHistory;
+
+    // ── Constructor ────────────────────────────────────────────────────────────
+
+    /**
+     * Constructs the model, creates the three board trees, wires the
+     * collaborators, and generates the first puzzle.
+     */
+    public SudokuModel() {
+        solutionTree = new SudokuBoardTree();
+        boardTree    = new SudokuBoardTree();
+        fixedTree    = new SudokuBoardTree();
+
+        generator   = new SudokuGenerator(solutionTree, boardTree, fixedTree);
+        validator   = new SudokuValidator(boardTree, solutionTree);
+        moveHistory = new MoveHistory();
+
+>>>>>>> 90907dc1bcae63501b91cb1c565795d81e6d4986
         generateNewPuzzle();
     }
 
-    // -------------------------------------------------------------------------
-    // ISudokuModel — public API
-    // -------------------------------------------------------------------------
+    // ── ISudokuModel ───────────────────────────────────────────────────────────
 
     /** {@inheritDoc} */
     @Override
     public void generateNewPuzzle() {
+<<<<<<< HEAD
         clearFixed();
         moveHistory.clear();
         solution = generator.generate();           // Deque-backed board
         board    = new LinkedList<>(solution);     // copy as working board
         clearNonFixedCells();
         placePuzzleClues();
+=======
+        moveHistory.clear();
+        generator.generate();
+>>>>>>> 90907dc1bcae63501b91cb1c565795d81e6d4986
     }
 
     /** {@inheritDoc} */
@@ -90,7 +141,13 @@ public class SudokuModel implements ISudokuModel {
     public void resetPuzzle() {
         for (int r = 0; r < BOARD_SIZE; r++) {
             for (int c = 0; c < BOARD_SIZE; c++) {
+<<<<<<< HEAD
                 if (!fixed[r][c]) boardSet(r, c, 0);
+=======
+                if (fixedTree.getValue(r, c) == 0) {
+                    boardTree.setValue(r, c, 0);
+                }
+>>>>>>> 90907dc1bcae63501b91cb1c565795d81e6d4986
             }
         }
         moveHistory.clear();
@@ -100,7 +157,11 @@ public class SudokuModel implements ISudokuModel {
     @Override
     public int getValue(int row, int col) {
         validateCoordinates(row, col);
+<<<<<<< HEAD
         return boardGet(board, row, col);
+=======
+        return boardTree.getValue(row, col);
+>>>>>>> 90907dc1bcae63501b91cb1c565795d81e6d4986
     }
 
     /** {@inheritDoc} */
@@ -108,22 +169,31 @@ public class SudokuModel implements ISudokuModel {
     public void setValue(int row, int col, int value) {
         validateCoordinates(row, col);
         validateValue(value);
+<<<<<<< HEAD
         if (fixed[row][col] || boardGet(board, row, col) == value) return;
         moveHistory.push(row, col, boardGet(board, row, col));
         boardSet(row, col, value);
+=======
+        if (fixedTree.getValue(row, col) == 1) return;
+        int previous = boardTree.getValue(row, col);
+        if (previous == value) return;
+        moveHistory.push(row, col, previous);
+        boardTree.setValue(row, col, value);
+>>>>>>> 90907dc1bcae63501b91cb1c565795d81e6d4986
     }
 
     /** {@inheritDoc} */
     @Override
     public boolean isFixed(int row, int col) {
         validateCoordinates(row, col);
-        return fixed[row][col];
+        return fixedTree.getValue(row, col) == 1;
     }
 
-    /** {@inheritDoc} */
+    /** {@inheritDoc} — delegates to {@link SudokuValidator}. */
     @Override
     public boolean hasConflict(int row, int col) {
         validateCoordinates(row, col);
+<<<<<<< HEAD
         int val = boardGet(board, row, col);
         if (val == 0) return false;
 
@@ -144,27 +214,43 @@ public class SudokuModel implements ISudokuModel {
             }
         }
         return false;
+=======
+        return validator.hasConflict(row, col);
+>>>>>>> 90907dc1bcae63501b91cb1c565795d81e6d4986
     }
 
     /** {@inheritDoc} */
     @Override
     public int getHintForCell(int row, int col) {
         validateCoordinates(row, col);
+<<<<<<< HEAD
         return boardGet(solution, row, col);
+=======
+        return solutionTree.getValue(row, col);
+>>>>>>> 90907dc1bcae63501b91cb1c565795d81e6d4986
     }
 
     /**
      * {@inheritDoc}
      *
+<<<<<<< HEAD
      * <p>Uses an {@link ArrayList} to collect and shuffle empty cells so the
      * returned cell is always random.</p>
+=======
+     * <p>Uses an {@link ArrayList} to collect and shuffle all empty cells,
+     * returning a random one.</p>
+>>>>>>> 90907dc1bcae63501b91cb1c565795d81e6d4986
      */
     @Override
     public int[] getRandomEmptyCell() {
         ArrayList<int[]> emptyCells = new ArrayList<>();
         for (int r = 0; r < BOARD_SIZE; r++) {
             for (int c = 0; c < BOARD_SIZE; c++) {
+<<<<<<< HEAD
                 if (boardGet(board, r, c) == 0) emptyCells.add(new int[]{r, c});
+=======
+                if (boardTree.getValue(r, c) == 0) emptyCells.add(new int[]{r, c});
+>>>>>>> 90907dc1bcae63501b91cb1c565795d81e6d4986
             }
         }
         if (emptyCells.isEmpty()) return null;
@@ -172,9 +258,10 @@ public class SudokuModel implements ISudokuModel {
         return emptyCells.get(0);
     }
 
-    /** {@inheritDoc} */
+    /** {@inheritDoc} — delegates to {@link SudokuValidator}. */
     @Override
     public boolean isSolved() {
+<<<<<<< HEAD
         for (int r = 0; r < BOARD_SIZE; r++) {
             for (int c = 0; c < BOARD_SIZE; c++) {
                 if (boardGet(board, r, c) == 0 || hasConflict(r, c)) return false;
@@ -240,10 +327,31 @@ public class SudokuModel implements ISudokuModel {
             for (int c = 0; c < BOARD_SIZE; c++) {
                 fixed[r][c] = false;
             }
+=======
+        return validator.isSolved();
+    }
+
+    /** {@inheritDoc} — delegates to {@link MoveHistory}. */
+    @Override
+    public void undoMove() {
+        int[] previous = moveHistory.pop();
+        if (previous != null) {
+            boardTree.setValue(previous[0], previous[1], previous[2]);
+>>>>>>> 90907dc1bcae63501b91cb1c565795d81e6d4986
         }
     }
 
+    /** {@inheritDoc} — delegates to {@link SudokuValidator}. */
+    @Override
+    public boolean isCorrectValue(int row, int col, int value) {
+        validateCoordinates(row, col);
+        return validator.isCorrectValue(row, col, value);
+    }
+
+    // ── Guards ─────────────────────────────────────────────────────────────────
+
     /**
+<<<<<<< HEAD
      * Sets every non-fixed cell on the working board to 0.
      */
     private void clearNonFixedCells() {
@@ -287,6 +395,10 @@ public class SudokuModel implements ISudokuModel {
      * Validates that {@code (row, col)} is within board bounds.
      *
      * @throws IllegalArgumentException if out of range
+=======
+     * Throws {@link IllegalArgumentException} if the coordinates fall outside
+     * the board range [0, BOARD_SIZE).
+>>>>>>> 90907dc1bcae63501b91cb1c565795d81e6d4986
      */
     private void validateCoordinates(int row, int col) {
         if (row < 0 || row >= BOARD_SIZE || col < 0 || col >= BOARD_SIZE) {
@@ -297,15 +409,24 @@ public class SudokuModel implements ISudokuModel {
     }
 
     /**
+<<<<<<< HEAD
      * Validates that {@code value} is a legal cell value (0 = empty,
      * 1..{@value ISudokuModel#BOARD_SIZE} = filled).
      *
      * @throws IllegalArgumentException if out of range
+=======
+     * Throws {@link IllegalArgumentException} if {@code value} is outside
+     * [0, BOARD_SIZE] (0 = clear, 1–BOARD_SIZE = valid digit).
+>>>>>>> 90907dc1bcae63501b91cb1c565795d81e6d4986
      */
     private void validateValue(int value) {
         if (value < 0 || value > BOARD_SIZE) {
             throw new IllegalArgumentException(
+<<<<<<< HEAD
                     "Invalid value: " + value + ". Must be 0–" + BOARD_SIZE
+=======
+                    "Invalid value: " + value + ". Must be 0 to " + BOARD_SIZE
+>>>>>>> 90907dc1bcae63501b91cb1c565795d81e6d4986
             );
         }
     }
