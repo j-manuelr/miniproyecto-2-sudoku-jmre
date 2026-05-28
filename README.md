@@ -3,7 +3,7 @@
 **Curso:** 750014C Fundamentos de Programación Orientada a Eventos (FPOE) — 2026-1  
 **Integrantes:** Juan Rosero - Natalia Parra  
 **Versión:** 1.0  
-**Repositorio:** https://github.com/TU_USUARIO/TU_REPO ← reemplazar con el enlace real
+**Repositorio:** https://github.com/j-manuelr/miniproyecto-2-sudoku-jmre-napp
 
 ---
 
